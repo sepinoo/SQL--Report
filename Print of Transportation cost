@@ -1,0 +1,181 @@
+DECLARE @ID int
+set @ID=6
+
+SELECT 
+		t.[FiscalYearRef]
+	,t.Driver2  'حمل کننده گذری'
+	,CASE	WHEN t.State = 1 THEN N'ثبت شده'
+				WHEN t.State = 2 THEN N'تایید شده'
+				WHEN t.State = 3 THEN N'تایید پرداخت شده'
+				END			AS 'وضعیت سند'
+	,	CASE 
+		WHEN t.[State]=1 then 'بارنامه جاده ای داخلی وزارت راه'
+		WHEN t.[State]=2 then 'بدون بارنامه و حواله'
+		WHEN t.[State]=3 then 'حواله بار موسسات'
+		ELSE NULL
+		END AS 'نوع بارنامه'
+	,	t.[Number] as ' شماره برگه'
+	,	t.[BillOfLadingNo] as 'سری بارنامه'
+	,	t.[BillOfLadingNoInt] as 'شماره بارنامه'
+	,	t.[BillOfLadingDate] as 'تاریخ بارنامه'
+	,	t.[SendingDate]  as'تاریخ ارسال بار'
+	,	t.[EntranceTime] as 'ساعت ورود'
+	,	t. [ExitTime] as 'ساعت خروج'
+	,	t.[PlateIdentifier] as 'شماره پلاک'
+	,	t.[WeightCapacity] 'ظرفیت وزنی(KG)'
+	,	t.[Amount] 'جمع هزینه حمل'
+	,	t.[SupplierRefDLCode] as 'تفصیلی طرف پرداخت'
+	,	t.[VoucherRef] 'شماره سند حسابداری'
+	,	t.[PaymentRequestRef] 'شماره درخواست پرداخت'
+	,	t.[TransportationCompanyRef]
+	,	v.Name + '/'+CAST(t.TransportationVehicleRef as NVARCHAR) 'نام/کد وسیله حمل'
+	,	t.TransportationVehicleRef 'کد' 
+	,	pl.Name 'مرکز نگهداری تحویل دهنده'
+	,	pt.FirstName+' '+pt.LastName 'طرف مقابل پرداخت'
+	,	t.[BillOfLadingNoBillOfLadingInstallment]
+	,	pc.Title 'تنخواه'
+	,	p2.FirstName+' '+p2.LastName 'حمل کننده'
+	,	case 
+		when t.[ArightPayment]=1 then   p2.FirstName+' '+p2.LastName
+		else 'نمیباشد'
+		end as 'پرداخت مستقیم به حمل کننده'
+	,	dl.Title 'IFO REF Name'
+	,	ti.IFOREFDLCode 'IFO REF CODE'
+	,	t.[Driver2]
+	,	p.FirstName+' '+p.LastName  as 'ایجاد کننده'
+	,	t.[CreationDate] as 'تاریخ ایجاد'
+	,	p1.FirstName+' '+p1.LastName  as 'آخرین اصلاح کننده'
+	,	ti. [TransportCostItemID]
+	,	ti.[InventoryVoucherRef] as 'شماره سند'
+	,	ti.CounterpartStoreName  + ti.[CounterPartName] 'نام انبار/نام مشتری'
+	,	ti.[DLIFOREFRef]
+	,	ti.[DLCostCenterRef]
+	,	ti.[DebitSLRef]
+	,	ti.[CreditSLRef]
+	,	ti.[TransportationCostItem] as 'هزینه حمل'
+	,	ti.[CostCenterDLCode] as 'کد حساب تفصیلی'
+	,	d.Title as 'نام حساب تفصیلی'
+	,	c.Number  as 'کد مرکز هزینه'
+	,	c.Name as 'نام مرکز هزینه'
+	,	ti.[IFOREFDLCode]
+	,	ti.[CareCrossroadSalesChannel] as 'کانال فروش/مرکز نگهداری'
+	,	ti.[CareCrossroadSalesChannelCode]
+	,	INVSALES.IVNumber as  ' شماره سند انبار'
+	,	INVSALES.IVSpecification as  'الگوی سند انبار'
+	,	INVSALES.IVDate as  'تاریخ سند انبار'
+	,	INVSALES.QTYKarton
+	,	INVSALES.InvoiceNumber  'شماره فاکتور فروش '
+	,	INVSALES.InvoiceDate  'تاریخ فاکتور فروش '
+	,	INVSALES.Category
+	,	INVSALES.SKUName
+	,	INVSALES.PartCode  'کد کالا '
+	,	INVSALES.PartName 'نام کالا '
+	,	INVSALES.PartPropertiesComment
+	,	INVSALES.CustomerNumber   'شماره مشتری'
+	,	INVSALES.MajorUnitQuantity  'تعداد کالا '
+	,	INVSALES.WeightT  
+
+
+from 
+				[USR3].[TransportCost] t		                 
+	INNER JOIN [USR3].[TransportCostItem] ti    on ti._masterref=t.transportCostID
+	
+	/*Creator and modifier*/
+	inner join  SYS3.[User] u										on t.Creator = u.UserID
+	left JOIN	GNR3.Party p								        ON u.PartyRef = p.PartyID
+	LEFT JOIN	SYS3.[User] u1							   			on t.LastModifier = u1.UserID
+	left JOIN	GNR3.Party p1									    ON u1.PartyRef = p1.PartyID
+	/*Party paier */
+	left JOIN	GNR3.Party pt									    ON t.PartyRef = pt.PartyID
+	left join	rpa3.PettyCash pc									on t.HolderFundRef=pc.PettyCashID
+	/*Transportation */
+	left JOIN	GNR3.Party p2									    ON t.DoerAriesRef = p2.PartyID
+	left join	lgs3.Plant pl										on t.PlantRef=pl.PlantID
+	left join	(	SELECT y.Name,a.TransportationVehicleID
+					FROM [Danon_Sg3].[LGS3].[TransportationVehicle] a
+						join LGS3.TransportationVehicleType  y	 on a.TransportationVehicleTypeRef=y.TransportationVehicleTypeID
+				) as v on t.TransportationVehicleRef=v.TransportationVehicleID
+	
+	/*items*/
+	left join [FIN3].[DL]  dl								     on  dl.DLID=ti.DLIFOREFRef
+	left join [FIN3].[DL]	d									 on ti.CostCenterDLCode=d.Code						
+	left join [GNR3].[CostCenter] c								 on d.ReferenceID=c.CostCenterID
+	
+	/*inventory vochers*/
+	left join
+	( 
+		/* Sales delivery and invoice */
+		SELECT 
+			InventoryVoucherID
+		,	s.Name IVSpecification
+		,	iv.Number AS IVNumber
+		,	iv.Date AS IVDate
+		,	ivi.RowNumber AS IVIRownumber
+		,	DBO.VWProductCAT.GroupAA  'Category'
+		,	case when pa.categoryref=2 then DBO.VWProductCAT.GroupC  when pa.categoryref<>2 then pa.[Name] else '' end as  'SKUName' 
+		,	pa.Code AS PartCode
+		,	pa.Name as PartName
+		,	pa.PropertiesComment AS PartPropertiesComment
+		,	invoiceitem.Number AS InvoiceNumber
+		,	invoiceitem.Date AS InvoiceDate
+		,	cu.Number   AS CustomerNumber
+		,	invoiceitem.MajorUnitQuantity  as MajorUnitQuantity
+		,	cast(ISNULL(ppu.Weight * ivi.MajorUnitQuantity,0) AS float) / 1000   AS WeightT
+		,	ISNULL(ivi.MajorUnitQuantity/ppu2.DSRatio,0)  AS QTYKarton
+	 
+		FROM
+		
+			(select * from LGS3.InventoryVoucher WHERE InventoryVoucherSpecificationRef in(69)) iv	  
+			left join LGS3.InventoryVoucherItem ivi						 on iv.InventoryVoucherID=ivi.InventoryVoucherRef
+			left join LGS3.InventoryVoucherSpecification s				 on iv.InventoryVoucherSpecificationRef=s.InventoryVoucherSpecificationID 
+			left join lgs3.Part  pa										on pa.PartID=ivi.PartRef
+			left JOIN  LGS3.PartUnit ppu								on	ppu.PartID = pa.PartID and	pa.MajorUnitRef = ppu.UnitID
+			left JOIN  LGS3.PartUnit ppu2								on	ppu2.PartID = pa.PartID and ppu2.UnitID=9
+			LEFT JOIN   DBO.VWProductCAT					            on	DBO.VWProductCAT.PartRef=pa.PartID
+
+			left join (	select 
+							r.InvoiceID,r.Number,r.Date,r.CustomerRef, ri.InvoiceRef, ri.InvoiceItemID,ri.RowNumber,ri.ProductRef,ri.ProductUnitRef
+							,ri.Quantity,ri.MajorUnitQuantity,ri.NetPrice,ri.ReferenceRef,rc.TargetType ,rc.SourceType,TargetRef , rc.SourceRef 
+						from 	
+							sls3.Invoice  r				
+							left join     sls3.InvoiceItem ri	           on   r.InvoiceID =ri.InvoiceRef					   
+							LEFT JOIN     SYS3.RecursiveEntityRelation rc  ON  ri.InvoiceItemID=rc.TargetRef    and  rc.SourceType=574--@InventoryVoucherItem 
+																												AND TargetType=913--@InvoiceItem
+						where TargetRef IS NOT NULL and SourceRef IS NOT NULL
+						) as invoiceitem on ivi.InventoryVoucherItemID=invoiceitem.SourceRef
+			left join [SLS3].[Product] pr								on invoiceitem.ProductRef=pr.ProductID
+			left join sls3.Customer  cu									on invoiceitem.CustomerRef=cu.CustomerID
+
+		UNION ALL
+			/* حواله انتقال */
+		SELECT 
+			InventoryVoucherID
+		,	s.Name IVSpecification
+		,	iv.Number AS IVNumber
+		,	iv.Date AS IVDate
+		,	ivi.RowNumber AS IVIRownumber
+		,	DBO.VWProductCAT.GroupAA  'Category'
+		,	case when pa.categoryref=2 then DBO.VWProductCAT.GroupC  when pa.categoryref<>2 then pa.[Name] else '' end as  'SKUName' 
+		,	pa.Code AS PartCode
+		,	pa.Name as PartName
+		,	pa.PropertiesComment AS PartPropertiesComment
+		,	NULL AS InvoiceNumber
+		,	NULL AS InvoiceDate
+		,	NULL   AS CustomerNumber
+		,	ivi.MajorUnitQuantity  as MajorUnitQuantity
+		,	cast(ISNULL(ppu.Weight * ivi.MajorUnitQuantity,0) AS float) / 1000    AS WeightT
+		,	ISNULL(ivi.MajorUnitQuantity/ppu2.DSRatio,0)  AS QTYKarton
+	 
+		FROM
+			(select * from LGS3.InventoryVoucher WHERE InventoryVoucherSpecificationRef in(68)) iv
+			left join LGS3.InventoryVoucherItem ivi						 on iv.InventoryVoucherID=ivi.InventoryVoucherRef
+			left join LGS3.InventoryVoucherSpecification s				 on iv.InventoryVoucherSpecificationRef=s.InventoryVoucherSpecificationID  
+			left join lgs3.Part  pa										on pa.PartID=ivi.PartRef
+			left JOIN  LGS3.PartUnit ppu								on	ppu.PartID = pa.PartID and	pa.MajorUnitRef = ppu.UnitID
+			left JOIN  LGS3.PartUnit ppu2								on	ppu2.PartID = pa.PartID and ppu2.UnitID=9
+			LEFT JOIN   DBO.VWProductCAT					            on	DBO.VWProductCAT.PartRef=pa.PartID
+
+	) INVSALES on ti.InventoryVoucherRef=INVSALES.InventoryVoucherID 
+
+
+where t.TransportCostID=@ID
